@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import {
   VStack,
+  Container,
   Button,
   Text,
   HStack,
   Select,
   Input,
-  Box
+  Box,
+  useToast
 } from "@chakra-ui/react";
 import { CheckCircleIcon, WarningIcon } from "@chakra-ui/icons";
 import { Tooltip } from "@chakra-ui/react";
@@ -15,6 +17,8 @@ import { toHex, truncateAddress } from "./utils";
 import { ethers } from "ethers";
 import Web3Modal from "web3modal";
 import { providerOptions } from "./providerOptions";
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from "./Config.js";
+import StreamInformation from "./components/StreamInformation";
 
 const web3Modal = new Web3Modal({
   cacheProvider: true, // optional
@@ -32,6 +36,10 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [signedMessage, setSignedMessage] = useState("");
   const [verified, setVerified] = useState();
+  const [streamId, setId] = useState();
+  const [amount, setAmount] = useState();
+  var [streamsData, setStreamsData] = useState([]);
+  const toast = useToast();
 
   const connectWallet = async () => {
     try {
@@ -40,9 +48,17 @@ export default function Home() {
       const accounts = await library.listAccounts();
       const network = await library.getNetwork();
       setProvider(provider);
-      setLibrary(library);
       if (accounts) setAccount(accounts[0]);
       setChainId(network.chainId);
+      setLibrary(library);
+      toast({
+        title: "Connected.",
+        description:
+          "You are connected as " + account + " on " + getNetworkName() + ".",
+        status: "success",
+        duration: 4000,
+        isClosable: true
+      });
     } catch (error) {
       setError(error);
     }
@@ -51,6 +67,29 @@ export default function Home() {
   const handleNetwork = (e) => {
     const id = e.target.value;
     setNetwork(Number(id));
+  };
+
+  const getNetworkName = () => {
+    switch (chainId) {
+      case 3:
+        return "Ropsten";
+        break;
+      case 4:
+        return "Rinkeby";
+        break;
+      case 42:
+        return "Kovan";
+        break;
+      case 1666600000:
+        return "Harmony";
+        break;
+      case 42220:
+        return "Celo";
+        break;
+      default:
+        return null;
+        break;
+    }
   };
 
   const handleInput = (e) => {
@@ -63,6 +102,13 @@ export default function Home() {
       await library.provider.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: toHex(network) }]
+      });
+      toast({
+        title: "Network changed.",
+        description: "You are now connected on " + getNetworkName() + ".",
+        status: "success",
+        duration: 4000,
+        isClosable: true
       });
     } catch (switchError) {
       if (switchError.code === 4902) {
@@ -105,6 +151,64 @@ export default function Home() {
     }
   };
 
+  const buy = async () => {
+    if (!library) return;
+    try {
+      const signer = library.getSigner();
+      const serviceContract = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        CONTRACT_ABI,
+        signer
+      );
+
+      //setWarning("Initialize payment");
+      let txn = await serviceContract.buy(streamId, amount);
+
+      //setWarning("Mining... please wait");
+      await txn.wait();
+      //getCounterHandler();
+      /*setSuccess(
+        `Mined, see transaction: https://rinkeby.etherscan.io/tx/${txn.hash}`
+      );*/
+    } catch (error) {
+      setError(error);
+    }
+  };
+
+  const lastStreamId = async () => {
+    if (!library) return;
+    try {
+      const signer = library.getSigner();
+      const serviceContract = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        CONTRACT_ABI,
+        signer
+      );
+
+      let id = await serviceContract.collectionId();
+      return id;
+    } catch (error) {
+      setError(error);
+    }
+  };
+
+  const showStreams = async () => {
+    //alert(await lastStreamId());
+    if (!library) return;
+    try {
+      const signer = library.getSigner();
+      const serviceContract = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        CONTRACT_ABI,
+        signer
+      );
+      for (var i = 0; i < lastStreamId; i++) {}
+    } catch (error) {
+      setError(error);
+    }
+    return <div>{lastStreamId}</div>;
+  };
+
   const refreshState = () => {
     setAccount();
     setChainId();
@@ -117,6 +221,13 @@ export default function Home() {
   const disconnect = async () => {
     await web3Modal.clearCachedProvider();
     refreshState();
+    toast({
+      title: "Disconnected.",
+      description: "You are disconnected from the App.",
+      status: "success",
+      duration: 4000,
+      isClosable: true
+    });
   };
 
   useEffect(() => {
@@ -157,19 +268,8 @@ export default function Home() {
 
   return (
     <>
-      <Text position="absolute" top={0} right="15px">
-        If you're in the sandbox, first "Open in New Window" ⬆️
-      </Text>
-      <VStack justifyContent="center" alignItems="center" h="100vh">
-        <HStack marginBottom="10px">
-          <Text
-            margin="0"
-            lineHeight="1.15"
-            fontSize={["1.5em", "2em", "3em", "4em"]}
-            fontWeight="600"
-          >
-            Let's connect with
-          </Text>
+      <Container>
+        <VStack position="absolute" top={0} left="15px">
           <Text
             margin="0"
             lineHeight="1.15"
@@ -181,107 +281,163 @@ export default function Home() {
               WebkitTextFillColor: "transparent"
             }}
           >
-            Web3Modal
+            Stream.io
           </Text>
-        </HStack>
-        <HStack>
+          <Text fontSize="small" fontWeight="600">
+            Passive income for everyone!
+          </Text>
+        </VStack>
+        <HStack position="absolute" top={0} right="15px">
+          <Tooltip label={account} placement="right">
+            <Text>
+              {`${truncateAddress(account)} (${
+                chainId ? getNetworkName() : "Not connected"
+              }) `}
+              {account ? (
+                <CheckCircleIcon color="green" />
+              ) : (
+                <WarningIcon color="#cd5700" />
+              )}
+            </Text>
+          </Tooltip>
+
           {!account ? (
-            <Button onClick={connectWallet}>Connect Wallet</Button>
+            <Button size="sm" onClick={connectWallet}>
+              Connect Wallet
+            </Button>
           ) : (
-            <Button onClick={disconnect}>Disconnect</Button>
+            <Button size="sm" onClick={disconnect}>
+              Disconnect
+            </Button>
           )}
         </HStack>
-        <VStack justifyContent="center" alignItems="center" padding="10px 0">
-          <HStack>
-            <Text>{`Connection Status: `}</Text>
-            {account ? (
-              <CheckCircleIcon color="green" />
-            ) : (
-              <WarningIcon color="#cd5700" />
-            )}
-          </HStack>
-
-          <Tooltip label={account} placement="right">
-            <Text>{`Account: ${truncateAddress(account)}`}</Text>
-          </Tooltip>
-          <Text>{`Network ID: ${chainId ? chainId : "No Network"}`}</Text>
-        </VStack>
+        <HStack></HStack>
+      </Container>
+      <VStack justifyContent="center" alignItems="center" h="100vh">
         {account && (
-          <HStack justifyContent="flex-start" alignItems="flex-start">
-            <Box
-              maxW="sm"
-              borderWidth="1px"
-              borderRadius="lg"
-              overflow="hidden"
-              padding="10px"
-            >
-              <VStack>
-                <Button onClick={switchNetwork} isDisabled={!network}>
-                  Switch Network
-                </Button>
-                <Select placeholder="Select network" onChange={handleNetwork}>
-                  <option value="3">Ropsten</option>
-                  <option value="4">Rinkeby</option>
-                  <option value="42">Kovan</option>
-                  <option value="1666600000">Harmony</option>
-                  <option value="42220">Celo</option>
-                </Select>
-              </VStack>
-            </Box>
-            <Box
-              maxW="sm"
-              borderWidth="1px"
-              borderRadius="lg"
-              overflow="hidden"
-              padding="10px"
-            >
-              <VStack>
-                <Button onClick={signMessage} isDisabled={!message}>
-                  Sign Message
-                </Button>
-                <Input
-                  placeholder="Set Message"
-                  maxLength={20}
-                  onChange={handleInput}
-                  w="140px"
-                />
-                {signature ? (
-                  <Tooltip label={signature} placement="bottom">
-                    <Text>{`Signature: ${truncateAddress(signature)}`}</Text>
-                  </Tooltip>
-                ) : null}
-              </VStack>
-            </Box>
-            <Box
-              maxW="sm"
-              borderWidth="1px"
-              borderRadius="lg"
-              overflow="hidden"
-              padding="10px"
-            >
-              <VStack>
-                <Button onClick={verifyMessage} isDisabled={!signature}>
-                  Verify Message
-                </Button>
-                {verified !== undefined ? (
-                  verified === true ? (
-                    <VStack>
-                      <CheckCircleIcon color="green" />
-                      <Text>Signature Verified!</Text>
-                    </VStack>
-                  ) : (
-                    <VStack>
-                      <WarningIcon color="red" />
-                      <Text>Signature Denied!</Text>
-                    </VStack>
-                  )
-                ) : null}
-              </VStack>
-            </Box>
-          </HStack>
+          <VStack>
+            <HStack justifyContent="flex-start" alignItems="flex-start">
+              <Box
+                maxW="sm"
+                borderWidth="1px"
+                borderRadius="lg"
+                overflow="hidden"
+                padding="10px"
+              >
+                <VStack>
+                  <Button onClick={switchNetwork} isDisabled={!network}>
+                    Switch Network
+                  </Button>
+                  <Select placeholder="Select network" onChange={handleNetwork}>
+                    <option value="3">Ropsten</option>
+                    <option value="4">Rinkeby</option>
+                    <option value="42">Kovan</option>
+                    <option value="1666600000">Harmony</option>
+                    <option value="42220">Celo</option>
+                  </Select>
+                </VStack>
+              </Box>
+              <Box
+                maxW="sm"
+                borderWidth="1px"
+                borderRadius="lg"
+                overflow="hidden"
+                padding="10px"
+              >
+                <VStack>
+                  <Button onClick={signMessage} isDisabled={!message}>
+                    Sign Message
+                  </Button>
+                  <Input
+                    placeholder="Set Message"
+                    maxLength={20}
+                    onChange={handleInput}
+                    w="140px"
+                  />
+                  {signature ? (
+                    <Tooltip label={signature} placement="bottom">
+                      <Text>{`Signature: ${truncateAddress(signature)}`}</Text>
+                    </Tooltip>
+                  ) : null}
+                </VStack>
+              </Box>
+              <Box
+                maxW="sm"
+                borderWidth="1px"
+                borderRadius="lg"
+                overflow="hidden"
+                padding="10px"
+              >
+                <VStack>
+                  <Button onClick={verifyMessage} isDisabled={!signature}>
+                    Verify Message
+                  </Button>
+                  {verified !== undefined ? (
+                    verified === true ? (
+                      <VStack>
+                        <CheckCircleIcon color="green" />
+                        <Text>Signature Verified!</Text>
+                      </VStack>
+                    ) : (
+                      <VStack>
+                        <WarningIcon color="red" />
+                        <Text>Signature Denied!</Text>
+                      </VStack>
+                    )
+                  ) : null}
+                </VStack>
+              </Box>
+            </HStack>
+            <HStack>
+              <Box
+                maxW="sm"
+                borderWidth="1px"
+                borderRadius="lg"
+                overflow="hidden"
+                padding="10px"
+              >
+                <VStack>
+                  <Button onClick={buy} isDisabled={!(streamId && amount)}>
+                    Buy
+                  </Button>
+                  <HStack>
+                    <Input
+                      onChange={(e) => {
+                        setId(e.target.value);
+                      }}
+                      placeholder="Stream Id"
+                    />
+                    <Input
+                      onChange={(e) => {
+                        setAmount(e.target.value);
+                      }}
+                      placeholder="Share Amount"
+                    />
+                  </HStack>
+                </VStack>
+              </Box>
+            </HStack>
+            <HStack>
+              <Box
+                maxW="sm"
+                borderWidth="1px"
+                borderRadius="lg"
+                overflow="hidden"
+                padding="10px"
+              >
+                <VStack>
+                  <Button onClick={showStreams}>Show Streams</Button>
+                </VStack>
+              </Box>
+            </HStack>
+          </VStack>
         )}
         <Text>{error ? error.message : null}</Text>
       </VStack>
+      <div>
+        <h1>Streams</h1>
+        <StreamInformation library={library} />
+      </div>
     </>
   );
 }
