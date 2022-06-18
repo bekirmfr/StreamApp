@@ -1,26 +1,27 @@
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "../Config.js";
 import { ethers } from "ethers";
 
-export function getStreamInformation(library) {
-  //alert(library);
+export async function getStreamInformation() {
   const lastStreamId = async () => {
-    alert("lastStreamId before if");
-    //if (!library) return;
+    const provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+    if (!provider) return;
     try {
-      const signer = library.getSigner();
+      const signer = provider.getSigner();
       const serviceContract = new ethers.Contract(
         CONTRACT_ADDRESS,
         CONTRACT_ABI,
         signer
       );
-      alert("lastStreamId after if");
-      return await serviceContract.collectionId();
+      let result = await serviceContract.collectionId();
+      console.log(result);
+      return result;
     } catch (error) {
-      //setError(error);
+      console.log(error);
     }
   };
 
-  return new Promise((resolve) => {
-    resolve({ lastId: 5 });
+  return new Promise(async (resolve) => {
+    let id = await lastStreamId();
+    resolve({ lastId: id });
   });
 }

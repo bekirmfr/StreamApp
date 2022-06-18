@@ -38,7 +38,7 @@ export default function Home() {
   const [verified, setVerified] = useState();
   const [streamId, setId] = useState();
   const [amount, setAmount] = useState();
-  var [streamsData, setStreamsData] = useState([]);
+  //var [streamsData, setStreamsData] = useState([]);
   const toast = useToast();
 
   const connectWallet = async () => {
@@ -73,22 +73,16 @@ export default function Home() {
     switch (chainId) {
       case 3:
         return "Ropsten";
-        break;
       case 4:
         return "Rinkeby";
-        break;
       case 42:
         return "Kovan";
-        break;
       case 1666600000:
         return "Harmony";
-        break;
       case 42220:
         return "Celo";
-        break;
       default:
         return null;
-        break;
     }
   };
 
@@ -160,16 +154,8 @@ export default function Home() {
         CONTRACT_ABI,
         signer
       );
-
-      //setWarning("Initialize payment");
       let txn = await serviceContract.buy(streamId, amount);
-
-      //setWarning("Mining... please wait");
       await txn.wait();
-      //getCounterHandler();
-      /*setSuccess(
-        `Mined, see transaction: https://rinkeby.etherscan.io/tx/${txn.hash}`
-      );*/
     } catch (error) {
       setError(error);
     }
@@ -190,23 +176,6 @@ export default function Home() {
     } catch (error) {
       setError(error);
     }
-  };
-
-  const showStreams = async () => {
-    //alert(await lastStreamId());
-    if (!library) return;
-    try {
-      const signer = library.getSigner();
-      const serviceContract = new ethers.Contract(
-        CONTRACT_ADDRESS,
-        CONTRACT_ABI,
-        signer
-      );
-      for (var i = 0; i < lastStreamId; i++) {}
-    } catch (error) {
-      setError(error);
-    }
-    return <div>{lastStreamId}</div>;
   };
 
   const refreshState = () => {
@@ -426,7 +395,7 @@ export default function Home() {
                 padding="10px"
               >
                 <VStack>
-                  <Button onClick={showStreams}>Show Streams</Button>
+                  <Button onClick={lastStreamId}>Show Streams</Button>
                 </VStack>
               </Box>
             </HStack>
@@ -436,7 +405,7 @@ export default function Home() {
       </VStack>
       <div>
         <h1>Streams</h1>
-        <StreamInformation library={library} />
+        <StreamInformation />
       </div>
     </>
   );
