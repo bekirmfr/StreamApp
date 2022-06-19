@@ -2,7 +2,7 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI } from "../Config.js";
 import { ethers } from "ethers";
 
 export async function getStreamInformation() {
-  const lastStreamId = async () => {
+  const data = async () => {
     const provider = new ethers.providers.Web3Provider(window.ethereum, "any");
     if (!provider) return;
     try {
@@ -12,16 +12,21 @@ export async function getStreamInformation() {
         CONTRACT_ABI,
         signer
       );
-      let result = await serviceContract.collectionId();
-      console.log(result);
-      return result;
+      let lastId = await serviceContract.collectionId();
+      console.log("Last Collection ID: ".$lastId);
+      const data = [];
+      for (var i = 1; i <= lastId; i++) {
+        let collection = await serviceContract.getCollection(i);
+        data.push(collection);
+      }
+      console.log(data);
+      return data;
     } catch (error) {
       console.log(error);
     }
   };
 
   return new Promise(async (resolve) => {
-    let id = await lastStreamId();
-    resolve({ lastId: id });
+    resolve(await data());
   });
 }
