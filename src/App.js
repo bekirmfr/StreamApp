@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, createContext } from "react";
 import {
   VStack,
   Container,
@@ -8,24 +8,34 @@ import {
   Select,
   Input,
   Box,
-  useToast
+  useToast,
+  Flex,
+  useColorModeValue,
+  Stack,
+  useColorMode
 } from "@chakra-ui/react";
-import { CheckCircleIcon, WarningIcon } from "@chakra-ui/icons";
+import {
+  CheckCircleIcon,
+  WarningIcon,
+  CopyIcon,
+  MoonIcon,
+  SunIcon
+} from "@chakra-ui/icons";
 import { Tooltip } from "@chakra-ui/react";
 import { networkParams } from "./networks";
-import { toHex, truncateAddress } from "./utils";
+import { toHex, truncateAddress, copyToClipboard } from "./utils";
 import { ethers } from "ethers";
 import Web3Modal from "web3modal";
 import { providerOptions } from "./providerOptions";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "./Config.js";
-import StreamInformation from "./components/StreamInformation";
+import StreamTable from "./components/StreamTable";
 
 const web3Modal = new Web3Modal({
   cacheProvider: true, // optional
   providerOptions // required
 });
-
-export default function Home() {
+export const Web3Context = createContext();
+export default function App() {
   const [provider, setProvider] = useState();
   const [library, setLibrary] = useState();
   const [account, setAccount] = useState();
@@ -38,7 +48,6 @@ export default function Home() {
   const [verified, setVerified] = useState();
   const [streamId, setId] = useState();
   const [amount, setAmount] = useState();
-  //var [streamsData, setStreamsData] = useState([]);
   const toast = useToast();
 
   const connectWallet = async () => {
@@ -161,23 +170,6 @@ export default function Home() {
     }
   };
 
-  const lastStreamId = async () => {
-    if (!library) return;
-    try {
-      const signer = library.getSigner();
-      const serviceContract = new ethers.Contract(
-        CONTRACT_ADDRESS,
-        CONTRACT_ABI,
-        signer
-      );
-
-      let id = await serviceContract.collectionId();
-      return id;
-    } catch (error) {
-      setError(error);
-    }
-  };
-
   const refreshState = () => {
     setAccount();
     setChainId();
@@ -194,7 +186,7 @@ export default function Home() {
       title: "Disconnected.",
       description: "You are disconnected from the App.",
       status: "success",
-      duration: 4000,
+      duration: 3000,
       isClosable: true
     });
   };
@@ -235,178 +227,191 @@ export default function Home() {
     }
   }, [provider]);
 
+  const { colorMode, toggleColorMode } = useColorMode();
+
   return (
     <>
-      <Container>
-        <VStack position="absolute" top={0} left="15px">
-          <Text
-            margin="0"
-            lineHeight="1.15"
-            fontSize={["1.5em", "2em", "3em", "4em"]}
-            fontWeight="600"
-            sx={{
-              background: "linear-gradient(90deg, #1652f0 0%, #b9cbfb 70.35%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent"
-            }}
-          >
-            Stream.io
-          </Text>
-          <Text fontSize="small" fontWeight="600">
-            Passive income for everyone!
-          </Text>
-        </VStack>
-        <HStack position="absolute" top={0} right="15px">
-          <Tooltip label={account} placement="right">
+      <Flex
+        as="header"
+        h={16}
+        alignItems={"center"}
+        justifyContent={"space-between"}
+        bg={useColorModeValue("gray.100", "gray.900")}
+        px={5}
+        w="100%"
+        backdropFilter="saturate(180%) blur(5px)"
+        pos="relative"
+        boxSize="full"
+        position="static"
+      >
+        <Box>Stream.io</Box>
+        <Flex alignItems={"center"}>
+          <Stack direction={"row"} spacing={2} overflow="visible">
+            {account && (
+              <Box>
+                <Tooltip label={account} placement="right">
+                  <Text>{`${truncateAddress(account)}`}</Text>
+                </Tooltip>
+              </Box>
+            )}
+            {account && (
+              <CopyIcon
+                onClick={() => {
+                  if (copyToClipboard(account))
+                    toast({
+                      description:
+                        "Address " + account + " is copied to clipboard.",
+                      status: "success",
+                      duration: 2000,
+                      isClosable: true
+                    });
+                }}
+              />
+            )}
             <Text>
-              {`${truncateAddress(account)} (${
-                chainId ? getNetworkName() : "Not connected"
-              }) `}
+              {chainId && getNetworkName()}
               {account ? (
                 <CheckCircleIcon color="green" />
               ) : (
                 <WarningIcon color="#cd5700" />
               )}
             </Text>
-          </Tooltip>
-
-          {!account ? (
-            <Button size="sm" onClick={connectWallet}>
-              Connect Wallet
+            {!account ? (
+              <Button size="l" onClick={connectWallet}>
+                Connect Wallet
+              </Button>
+            ) : (
+              <Button size="l" onClick={disconnect}>
+                Disconnect
+              </Button>
+            )}
+          </Stack>
+          <Stack direction={"row"} spacing={7}>
+            <Button onClick={toggleColorMode}>
+              {colorMode === "light" ? <MoonIcon /> : <SunIcon />}
             </Button>
-          ) : (
-            <Button size="sm" onClick={disconnect}>
-              Disconnect
-            </Button>
+          </Stack>
+        </Flex>
+      </Flex>
+      <Container as="main" mt="20">
+        <VStack justifyContent="center" alignItems="center" h="100vh">
+          {account && (
+            <VStack>
+              <HStack justifyContent="flex-start" alignItems="flex-start">
+                <Box
+                  maxW="sm"
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  overflow="hidden"
+                  padding="10px"
+                >
+                  <VStack>
+                    <Button onClick={switchNetwork} isDisabled={!network}>
+                      Switch Network
+                    </Button>
+                    <Select
+                      placeholder="Select network"
+                      onChange={handleNetwork}
+                    >
+                      <option value="3">Ropsten</option>
+                      <option value="4">Rinkeby</option>
+                      <option value="42">Kovan</option>
+                      <option value="1666600000">Harmony</option>
+                      <option value="42220">Celo</option>
+                    </Select>
+                  </VStack>
+                </Box>
+                <Box
+                  maxW="sm"
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  overflow="hidden"
+                  padding="10px"
+                >
+                  <VStack>
+                    <Button onClick={signMessage} isDisabled={!message}>
+                      Sign Message
+                    </Button>
+                    <Input
+                      placeholder="Set Message"
+                      maxLength={20}
+                      onChange={handleInput}
+                      w="140px"
+                    />
+                    {signature ? (
+                      <Tooltip label={signature} placement="bottom">
+                        <Text>{`Signature: ${truncateAddress(
+                          signature
+                        )}`}</Text>
+                      </Tooltip>
+                    ) : null}
+                  </VStack>
+                </Box>
+                <Box
+                  maxW="sm"
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  overflow="hidden"
+                  padding="10px"
+                >
+                  <VStack>
+                    <Button onClick={verifyMessage} isDisabled={!signature}>
+                      Verify Message
+                    </Button>
+                    {verified !== undefined ? (
+                      verified === true ? (
+                        <VStack>
+                          <CheckCircleIcon color="green" />
+                          <Text>Signature Verified!</Text>
+                        </VStack>
+                      ) : (
+                        <VStack>
+                          <WarningIcon color="red" />
+                          <Text>Signature Denied!</Text>
+                        </VStack>
+                      )
+                    ) : null}
+                  </VStack>
+                </Box>
+              </HStack>
+              <HStack>
+                <Box
+                  maxW="sm"
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  overflow="hidden"
+                  padding="10px"
+                >
+                  <VStack>
+                    <Button onClick={buy} isDisabled={!(streamId && amount)}>
+                      Buy
+                    </Button>
+                    <HStack>
+                      <Input
+                        onChange={(e) => {
+                          setId(e.target.value);
+                        }}
+                        placeholder="Stream Id"
+                      />
+                      <Input
+                        onChange={(e) => {
+                          setAmount(e.target.value);
+                        }}
+                        placeholder="Share Amount"
+                      />
+                    </HStack>
+                  </VStack>
+                </Box>
+              </HStack>
+            </VStack>
           )}
-        </HStack>
-        <HStack></HStack>
+          <h1>Streams</h1>
+          <Web3Context.Provider value={{ provider, library, account }}>
+            <StreamTable />
+          </Web3Context.Provider>
+          <Text color="red">{error ? error.message : null}</Text>
+        </VStack>
       </Container>
-      <VStack justifyContent="center" alignItems="center" h="100vh">
-        {account && (
-          <VStack>
-            <HStack justifyContent="flex-start" alignItems="flex-start">
-              <Box
-                maxW="sm"
-                borderWidth="1px"
-                borderRadius="lg"
-                overflow="hidden"
-                padding="10px"
-              >
-                <VStack>
-                  <Button onClick={switchNetwork} isDisabled={!network}>
-                    Switch Network
-                  </Button>
-                  <Select placeholder="Select network" onChange={handleNetwork}>
-                    <option value="3">Ropsten</option>
-                    <option value="4">Rinkeby</option>
-                    <option value="42">Kovan</option>
-                    <option value="1666600000">Harmony</option>
-                    <option value="42220">Celo</option>
-                  </Select>
-                </VStack>
-              </Box>
-              <Box
-                maxW="sm"
-                borderWidth="1px"
-                borderRadius="lg"
-                overflow="hidden"
-                padding="10px"
-              >
-                <VStack>
-                  <Button onClick={signMessage} isDisabled={!message}>
-                    Sign Message
-                  </Button>
-                  <Input
-                    placeholder="Set Message"
-                    maxLength={20}
-                    onChange={handleInput}
-                    w="140px"
-                  />
-                  {signature ? (
-                    <Tooltip label={signature} placement="bottom">
-                      <Text>{`Signature: ${truncateAddress(signature)}`}</Text>
-                    </Tooltip>
-                  ) : null}
-                </VStack>
-              </Box>
-              <Box
-                maxW="sm"
-                borderWidth="1px"
-                borderRadius="lg"
-                overflow="hidden"
-                padding="10px"
-              >
-                <VStack>
-                  <Button onClick={verifyMessage} isDisabled={!signature}>
-                    Verify Message
-                  </Button>
-                  {verified !== undefined ? (
-                    verified === true ? (
-                      <VStack>
-                        <CheckCircleIcon color="green" />
-                        <Text>Signature Verified!</Text>
-                      </VStack>
-                    ) : (
-                      <VStack>
-                        <WarningIcon color="red" />
-                        <Text>Signature Denied!</Text>
-                      </VStack>
-                    )
-                  ) : null}
-                </VStack>
-              </Box>
-            </HStack>
-            <HStack>
-              <Box
-                maxW="sm"
-                borderWidth="1px"
-                borderRadius="lg"
-                overflow="hidden"
-                padding="10px"
-              >
-                <VStack>
-                  <Button onClick={buy} isDisabled={!(streamId && amount)}>
-                    Buy
-                  </Button>
-                  <HStack>
-                    <Input
-                      onChange={(e) => {
-                        setId(e.target.value);
-                      }}
-                      placeholder="Stream Id"
-                    />
-                    <Input
-                      onChange={(e) => {
-                        setAmount(e.target.value);
-                      }}
-                      placeholder="Share Amount"
-                    />
-                  </HStack>
-                </VStack>
-              </Box>
-            </HStack>
-            <HStack>
-              <Box
-                maxW="sm"
-                borderWidth="1px"
-                borderRadius="lg"
-                overflow="hidden"
-                padding="10px"
-              >
-                <VStack>
-                  <Button onClick={lastStreamId}>Show Streams</Button>
-                </VStack>
-              </Box>
-            </HStack>
-          </VStack>
-        )}
-        <Text>{error ? error.message : null}</Text>
-      </VStack>
-      <div>
-        <h1>Streams</h1>
-        <StreamInformation />
-      </div>
     </>
   );
 }
