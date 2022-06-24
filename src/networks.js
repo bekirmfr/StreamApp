@@ -18,3 +18,19 @@ export const networkParams = {
     ]
   }
 };
+export const getNetworkName = (chainId) => {
+  switch (chainId) {
+    case 3:
+      return "Ropsten";
+    case 4:
+      return "Rinkeby";
+    case 42:
+      return "Kovan";
+    case 1666600000:
+      return "Harmony";
+    case 42220:
+      return "Celo";
+    default:
+      return "Unregistered";
+  }
+};
